@@ -17,9 +17,10 @@ use Bitrix\Main;
 use Bitrix\Main\UserTable;
 use \Bitrix\Main\Application;
 use \Bitrix\Main\Data;
+
 class Test3ComponentClass extends CBitrixComponent
 {
-    
+
     public function onPrepareComponentParams($arParams)
     {
         global $USER;
@@ -29,18 +30,19 @@ class Test3ComponentClass extends CBitrixComponent
             $arParams["EVENT_NAME"] = "FEEDBACK_FORM";
         $arParams["EMAIL_TO"] = trim($arParams["EMAIL_TO"]);
         if ($arParams["EMAIL_TO"] == '')
-            $arParams["EMAIL_TO"] = COption::GetOptionString("main", "email_from");
+            // аналог D7
+            // $arParams["EMAIL_TO"] = COption::GetOptionString("main", "email_from");
+            $arParams["EMAIL_TO"] = Option::get("main", "email_from");
         $arParams["OK_TEXT"] = trim($arParams["OK_TEXT"]);
         if ($arParams["OK_TEXT"] == '')
             $arParams["OK_TEXT"] = GetMessage("MF_OK_MESSAGE");
-
         return $arParams;
     }
     protected function myResults()
     {
         global $USER;
         $result = [];
-        $result["PARAMS_HASH"] = md5(serialize($this->arParams).$this->GetTemplateName());
+        $result["PARAMS_HASH"] = md5(serialize($this->arParams) . $this->GetTemplateName());
         if ($_SERVER["REQUEST_METHOD"] == "POST" && $_POST["submit"] <> '' && (!isset($_POST["PARAMS_HASH"]) || $result["PARAMS_HASH"] === $_POST["PARAMS_HASH"])) {
             $result["ERROR_MESSAGE"] = array();
             if (check_bitrix_sessid()) {
@@ -58,7 +60,9 @@ class Test3ComponentClass extends CBitrixComponent
                     $captcha_code = $_POST["captcha_sid"];
                     $captcha_word = $_POST["captcha_word"];
                     $cpt = new CCaptcha();
-                    $captchaPass = COption::GetOptionString("main", "captcha_password", "");
+                    // аналог D7
+                    // $captchaPass = COption::GetOptionString("main", "captcha_password", "");
+                    $captchaPass = Option::get("main", "captcha_password", "");
                     if ($captcha_word <> '' && $captcha_code <> '') {
                         if (!$cpt->CheckCodeCrypt($captcha_word, $captcha_code, $captchaPass))
                             $result["ERROR_MESSAGE"][] = GetMessage("MF_CAPTCHA_WRONG");
@@ -75,9 +79,25 @@ class Test3ComponentClass extends CBitrixComponent
                     if (!empty($arParams["EVENT_MESSAGE_ID"])) {
                         foreach ($arParams["EVENT_MESSAGE_ID"] as $v)
                             if (intval($v) > 0)
-                                CEvent::Send($arParams["EVENT_NAME"], SITE_ID, $arFields, "N", intval($v));
+                                // аналог D7
+                                // CEvent::Send($arParams["EVENT_NAME"], SITE_ID, $arFields);
+                                Event::send(
+                                    array(
+                                        "EVENT_NAME" => $arParams["EVENT_NAME"],
+                                        "LID" => SITE_ID,
+                                        "C_FIELDS" => $arFields
+                                    ),
+                                );
                     } else
-                        CEvent::Send($this->arParams["EVENT_NAME"], SITE_ID, $arFields);
+                        // аналог D7
+                        // CEvent::Send($arParams["EVENT_NAME"], SITE_ID, $arFields);
+                        Event::send(
+                            array(
+                                "EVENT_NAME" => $this->arParams["EVENT_NAME"],
+                                "LID" => SITE_ID,
+                                "C_FIELDS" => $arFields
+                            ),
+                        );
                     $_SESSION["MF_NAME"] = htmlspecialcharsbx($_POST["user_name"]);
                     $_SESSION["MF_EMAIL"] = htmlspecialcharsbx($_POST["user_email"]);
                     $event = new \Bitrix\Main\Event('main', 'onFeedbackFormSubmit', $arFields);
@@ -108,7 +128,7 @@ class Test3ComponentClass extends CBitrixComponent
         }
 
         if ($this->arParams["USE_CAPTCHA"] == "Y")
-        
+
             $result["capCode"] =  htmlspecialcharsbx($this->APPLICATION->CaptchaGetCode());
         $this->arResult = $result;
         return  true;
